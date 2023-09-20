@@ -1,7 +1,7 @@
 """The entry point for EPI downloader."""
 import asyncio
 from pprint import pprint
-from httpx import AsyncClient
+from httpx_cache import AsyncClient, FileCache
 from . import config
 from typing import Any
 import json
@@ -14,7 +14,7 @@ async def get_metadata(client: AsyncClient) -> dict[str, Any]:
 
 
 async def main() -> None:
-    async with AsyncClient(base_url=config.EPI_BASE_URL) as client:
+    async with AsyncClient(base_url=config.EPI_BASE_URL, cache=FileCache()) as client:
         metadata = await get_metadata(client)
         pprint(metadata)
 
