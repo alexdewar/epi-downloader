@@ -8,7 +8,7 @@
             "name": "EPI downloader",
             "type": "python",
             "request": "launch",
-            "module": "epi-downloader",
+            "module": "epi_downloader",
             "justMyCode": true
         }
     ]

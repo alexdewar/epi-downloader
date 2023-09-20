@@ -1,10 +1,12 @@
 """The entry point for EPI downloader."""
 import asyncio
-from pprint import pprint
-from httpx_cache import AsyncClient, FileCache
-from . import config
-from typing import Any
 import json
+from pprint import pprint
+from typing import Any
+
+from httpx_cache import AsyncClient, FileCache
+
+from . import config
 
 
 async def get_metadata(client: AsyncClient) -> dict[str, Any]:
