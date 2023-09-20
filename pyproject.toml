@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "MyProject"
+name = "EPI downloader"
 version = "0.1.0"
 description = ""
-authors = ["Jane Doe <jane_doe@some_email.com>"]
+authors = ["Alex Dewar <a.dewar@imperial.ac.uk>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -34,7 +34,7 @@ disallow_untyped_defs = false
 profile = "black"
 
 [tool.pytest.ini_options]
-addopts = "-v --mypy -p no:warnings --cov=myproject --cov-report=html --doctest-modules --ignore=myproject/__main__.py"
+addopts = "-v --mypy -p no:warnings --cov=epi-downloader --cov-report=html --doctest-modules --ignore=epi-downloader/__main__.py"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

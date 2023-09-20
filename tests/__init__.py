@@ -1,4 +1,4 @@
-"""Unit tests for MyProject."""
+"""Unit tests for EPI downloader."""
 
 from logging import getLogger
 
