@@ -5,10 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "EPI downloader",
+            "name": "Dump metadata",
             "type": "python",
             "request": "launch",
             "module": "epi_downloader",
+            "args": [
+                "--dump-metadata"
+            ],
             "justMyCode": true
         }
     ]
