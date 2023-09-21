@@ -198,8 +198,11 @@ def parse_args() -> argparse.Namespace:
             raise RuntimeError()
 
         args = parser.parse_args()
-        if args.dump_config and (args.config_path or args.output_path):
-            raise RuntimeError("--dump-config cannot be combined with other options")
+        if args.dump_config:
+            if args.config_path or args.output_path or args.no_cache:
+                raise RuntimeError(
+                    "--dump-config cannot be combined with other options"
+                )
         elif not (args.config_path and args.output_path):
             raise RuntimeError("Both --config and --output options are required")
     except RuntimeError as ex:
