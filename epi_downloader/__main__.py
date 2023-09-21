@@ -11,10 +11,19 @@ from . import config
 
 Metadata = dict[str, dict[str, int]]
 
+REQUIRED_VARS = ("model", "measure", "year", "age", "sex")
+EXAMPLE_CONFIG: dict[str, str] = {
+    "model": "Diabetes mellitus",
+    "measure": "Prevalence",
+    "year": "2015",
+    "age": "20-24 years",
+    "sex": "Male",
+}
+
 
 def _parse_metadata(metadata: dict[str, Any]) -> Metadata:
     out = {}
-    for var in ("model", "measure", "year", "age", "sex"):
+    for var in REQUIRED_VARS:
         out[var] = {
             str(item["name"]): item[f"{var}_id"] for item in metadata[var].values()
         }
@@ -22,10 +31,10 @@ def _parse_metadata(metadata: dict[str, Any]) -> Metadata:
     return out
 
 
-def dump_to_file(metadata: Metadata) -> None:
-    print("Saving metadata.json")
-    with open("metadata.json", "w") as file:
-        json.dump(metadata, file, indent=4)
+def write_json(file_name: str, data: Any) -> None:
+    print(f"Saving {file_name}")
+    with open(file_name, "w") as file:
+        json.dump(data, file, indent=4)
 
 
 async def load_metadata(client: AsyncClient) -> Metadata:
@@ -39,10 +48,10 @@ async def main() -> int:
         prog="epi_downloader", description="A tool to download datasets from IHME"
     )
     parser.add_argument(
-        "--dump-metadata",
-        dest="dump_metadata",
+        "--dump-config",
+        dest="dump_config",
         action="store_true",
-        help="Dump metadata to a series of JSON files",
+        help="Dump metadata and example config files",
     )
 
     if len(sys.argv) <= 1:
@@ -54,9 +63,9 @@ async def main() -> int:
     async with AsyncClient(base_url=config.EPI_BASE_URL, cache=FileCache()) as client:
         metadata = await load_metadata(client)
 
-    if args.dump_metadata:
-        dump_to_file(metadata)
-        return 0
+    if args.dump_config:
+        write_json("metadata.json", metadata)
+        write_json("example_config.json", EXAMPLE_CONFIG)
 
     return 0
 

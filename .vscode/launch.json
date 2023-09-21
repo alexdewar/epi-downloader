@@ -5,12 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Dump metadata",
+            "name": "Dump config",
             "type": "python",
             "request": "launch",
             "module": "epi_downloader",
             "args": [
-                "--dump-metadata"
+                "--dump-config"
             ],
             "justMyCode": true
         }
