@@ -13,6 +13,19 @@
                 "--dump-config"
             ],
             "justMyCode": true
+        },
+        {
+            "name": "Run example config",
+            "type": "python",
+            "request": "launch",
+            "module": "epi_downloader",
+            "args": [
+                "--config",
+                "${workspaceFolder}/example_config.json",
+                "--output",
+                "${workspaceFolder}/data.csv"
+            ],
+            "justMyCode": true
         }
     ]
 }
