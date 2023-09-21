@@ -1,10 +1,13 @@
 """The entry point for EPI downloader."""
 import asyncio
 import json
+import os
 import sys
 from argparse import ArgumentParser
+from pathlib import Path
 from typing import Any
 
+import platformdirs
 from httpx import AsyncClient
 
 from . import config
@@ -19,6 +22,31 @@ EXAMPLE_CONFIG: dict[str, str] = {
     "age": "20-24 years",
     "sex": "Male",
 }
+
+
+class CacheClient:
+    def __init__(self, client: AsyncClient, cache_path: Path) -> None:
+        self._client = client
+        self._cache_path = cache_path
+
+    async def get(self, url: str, file_name: str, *args: Any, **kwargs: Any) -> str:
+        file_path = self._cache_path / file_name
+
+        # If it's already cached, then load it
+        if file_path.exists():
+            with file_path.open() as file:
+                return file.read()
+
+        response = await self._client.get(url, *args, **kwargs)
+        response.raise_for_status()
+
+        # Don't bother caching empty files
+        if response.text:
+            os.makedirs(self._cache_path, exist_ok=True)
+            with file_path.open("w") as file:
+                file.write(response.text)
+
+        return response.text
 
 
 def _parse_metadata(metadata: dict[str, Any]) -> Metadata:
@@ -37,10 +65,9 @@ def write_json(file_name: str, data: Any) -> None:
         json.dump(data, file, indent=4)
 
 
-async def load_metadata(client: AsyncClient) -> Metadata:
-    resp = await client.get("/api/metadata")
-    resp.raise_for_status()
-    return _parse_metadata(json.loads(resp.content)["data"])
+async def load_metadata(client: CacheClient) -> Metadata:
+    text = await client.get("/api/metadata", "metadata.json")
+    return _parse_metadata(json.loads(text)["data"])
 
 
 async def main() -> int:
@@ -60,7 +87,9 @@ async def main() -> int:
 
     args = parser.parse_args()
 
-    async with AsyncClient(base_url=config.EPI_BASE_URL) as client:
+    async with AsyncClient(base_url=config.EPI_BASE_URL) as http_client:
+        cache_path = platformdirs.user_cache_path(__name__, ensure_exists=True)
+        client = CacheClient(http_client, cache_path)
         metadata = await load_metadata(client)
 
     if args.dump_config:
