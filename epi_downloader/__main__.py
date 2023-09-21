@@ -5,7 +5,7 @@ import sys
 from argparse import ArgumentParser
 from typing import Any
 
-from httpx_cache import AsyncClient, FileCache
+from httpx import AsyncClient
 
 from . import config
 
@@ -60,7 +60,7 @@ async def main() -> int:
 
     args = parser.parse_args()
 
-    async with AsyncClient(base_url=config.EPI_BASE_URL, cache=FileCache()) as client:
+    async with AsyncClient(base_url=config.EPI_BASE_URL) as client:
         metadata = await load_metadata(client)
 
     if args.dump_config:
