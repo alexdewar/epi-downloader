@@ -25,22 +25,27 @@ Versions = list[dict[str, Any]]
 
 
 class CacheClient:
-    def __init__(self, client: AsyncClient, cache_path: Path) -> None:
+    def __init__(
+        self, client: AsyncClient, cache_path: Path, ignore_cache: bool
+    ) -> None:
         self._client = client
         self._cache_path = cache_path
+        self._ignore_cache = ignore_cache
 
     async def get(self, url: str, file_name: str, *args: Any, **kwargs: Any) -> str:
         file_path = self._cache_path / file_name
 
-        # If it's already cached, then load it
-        if file_path.exists():
+        # If the data has already been cached (and the user hasn't opted out of using
+        # the cache) then load it from disk
+        if not self._ignore_cache and file_path.exists():
             with file_path.open() as file:
                 return file.read()
 
+        # Make HTTP request
         response = await self._client.get(url, *args, **kwargs)
         response.raise_for_status()
 
-        # Cache file
+        # Cache data on disk
         with file_path.open("w") as file:
             file.write(response.text)
 
@@ -177,6 +182,15 @@ def parse_args() -> argparse.Namespace:
         type=str,
         help="Path to save CSV data to",
     )
+    group.add_argument(
+        "--no-cache",
+        dest="no_cache",
+        action="store_true",
+        help=(
+            "Redownload data files even if they are in the cache. This is useful for "
+            "checking whether new data has become available since the last search."
+        ),
+    )
 
     # There might be a smarter way to validate arguments, but I can't figure it out
     try:
@@ -201,7 +215,7 @@ async def main() -> int:
 
     async with AsyncClient(base_url=EPI_BASE_URL) as http_client:
         cache_path = platformdirs.user_cache_path(APP_NAME, ensure_exists=True)
-        client = CacheClient(http_client, cache_path)
+        client = CacheClient(http_client, cache_path, args.no_cache)
         metadata = await load_metadata(client)
 
         if args.dump_config:
