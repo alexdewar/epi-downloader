@@ -8,6 +8,7 @@ authors = ["Alex Dewar <a.dewar@imperial.ac.uk>"]
 python = "^3.11"
 httpx = "^0.25.0"
 asyncio = "^3.4.3"
+platformdirs = "^3.10.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
