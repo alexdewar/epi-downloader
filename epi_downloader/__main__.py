@@ -3,25 +3,30 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Iterable, Mapping
+from io import StringIO
+from itertools import product
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import platformdirs
 from httpx import AsyncClient
 
 APP_NAME = "epi_downloader"
 EPI_BASE_URL = "https://vizhub.healthdata.org/epi"
 REQUIRED_VARS = ("model", "measure", "year", "age", "sex")
-EXAMPLE_CONFIG: dict[str, str] = {
-    "model": "Diabetes mellitus",
-    "measure": "Prevalence",
-    "year": "2015",
-    "age": "20-24 years",
-    "sex": "Male",
+EXAMPLE_CONFIG = {
+    "model": ["Diabetes mellitus"],
+    "measure": ["Prevalence"],
+    "year": ["2015"],
+    "age": ["20-24 years"],
+    "sex": ["Male"],
 }
 
 Metadata = dict[str, dict[str, int]]
 Versions = list[dict[str, Any]]
+Config = dict[str, list[int]]
 
 
 class CacheClient:
@@ -87,32 +92,42 @@ def get_model_version(versions: Versions, measure: int) -> int:
         return get_latest_model_version(versions, None)
 
 
-def load_config(config_path: str, metadata: Metadata) -> dict[str, int]:
+async def load_all_model_versions(
+    client: CacheClient, models: list[int]
+) -> dict[int, Versions]:
+    futures = (load_model_versions(client, model) for model in models)
+    all_versions: list[Versions] = await asyncio.gather(*futures)
+
+    return dict(zip(models, all_versions))
+
+
+def load_config(config_path: str, metadata: Metadata) -> Config:
     with open(config_path) as file:
         config = json.load(file)
 
-    # Convert the names to corresponding integer IDs
-    return {key: metadata[str(key)][value] for key, value in config.items()}
+    out: Config = {}
+    for key, values in config.items():
+        # Convert the names to corresponding integer IDs
+        out[key] = [metadata[key][str(value)] for value in values]
+
+    return out
 
 
-async def download_data(
-    client: CacheClient, config: dict[str, int], output_path: str
-) -> None:
-    versions = await load_model_versions(client, config["model"])
-
-    # Get version ID for dataset
-    version = get_model_version(versions, config["measure"])
-    params: dict[str, Any] = config | {"version": version, "measure": config["measure"]}
+async def load_dataset(
+    client: CacheClient, params: dict[str, int], version: int
+) -> pd.DataFrame:
+    # Append version ID to params
+    all_params: dict[str, Any] = params | {"version": version}
 
     # Keep params in same order so filename is consistent
-    params = dict(sorted(params.items()))
+    all_params = dict(sorted(all_params.items()))
 
     # A unique file name for this set of params
     param_str = "_".join(f"{key}{value}" for key, value in params.items())
     data_file_name = f"data_{param_str}.csv"
 
     # Extra parameters -- not sure what they mean
-    params = params | {
+    all_params |= {
         "type": "final",
         "bundle": "",
         "step": "",
@@ -125,15 +140,51 @@ async def download_data(
 
     # Download CSV file
     text = await client.get(
-        "/api/model/results/download", data_file_name, params=params
+        "/api/model/results/download", data_file_name, params=all_params
     )
     if not text:
         raise RuntimeError("No data available for the specified parameters")
 
-    # Save to user-specified path
+    return pd.read_csv(StringIO(text))
+
+
+def permute_parameter_grid(
+    param_grid: Mapping[str, Iterable[int]]
+) -> Iterable[dict[str, int]]:
+    """Generate each combination of parameters for the given parameter grid.
+
+    This function is a generator so the grid is computed lazily.
+
+    >>> list(_permute_parameter_grid({'a': range(2), 'b': range(3)}))
+    [{'a': 0, 'b': 0}, {'a': 0, 'b': 1}, {'a': 0, 'b': 2}, {'a': 1, 'b': 0}, {'a': 1, 'b': 1}, {'a': 1, 'b': 2}]
+    """  # noqa: E501
+    if not param_grid:
+        return
+
+    items = sorted(param_grid.items())
+    keys, values = zip(*items)
+    for v in product(*values):
+        yield dict(zip(keys, v))
+
+
+async def load_all_data(client: CacheClient, config: Config, output_path: str) -> None:
+    all_versions = await load_all_model_versions(client, config["model"])
+
+    data_futures = []
+    for params in permute_parameter_grid(config):
+        versions = all_versions[params["model"]]
+        version = get_model_version(versions, params["measure"])
+        data_futures.append(load_dataset(client, params, version))
+
+    all_data: list[pd.DataFrame] = await asyncio.gather(*data_futures)
+    print(f"Loaded {len(all_data)} data files (or tried to)")
+
+    # Merge DataFrames
+    df = pd.concat(all_data, ignore_index=True)
+
+    # Save combined dataset to file
     print(f"Saving data to {output_path}")
-    with open(output_path, "w") as file:
-        file.write(text)
+    df.to_csv(output_path, index=False)
 
 
 def parse_metadata(metadata: dict[str, Any]) -> Metadata:
@@ -227,7 +278,7 @@ async def main() -> int:
 
         if args.config_path:
             config = load_config(args.config_path, metadata)
-            await download_data(client, config, args.output_path)
+            await load_all_data(client, config, args.output_path)
 
     return 0
 
