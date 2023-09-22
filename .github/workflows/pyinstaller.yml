@@ -1,0 +1,38 @@
+name: Generate and upload binaries
+
+on: [release]
+
+jobs:
+  bundle:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+          - platform: windows
+            os: windows-latest
+          - platform: macos
+            os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v2.3.0
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Bundle with PyInstaller
+        run: poetry run pyinstaller -F epi_downloader.py -n epi_downloader_${{ matrix.platform }}
+
+      - name: Upload release artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/epi_downloader_${{ matrix.platform }}*
