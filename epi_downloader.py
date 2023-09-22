@@ -93,8 +93,12 @@ def get_model_version(versions: Versions, measure: int) -> int:
         return get_latest_model_version(versions, None)
 
 
+def id_to_str(id_dict: dict[str, int], id: int) -> str:
+    return next(k for k, v in id_dict.items() if v == id)
+
+
 async def load_all_model_versions(
-    client: CacheClient, models: list[int]
+    client: CacheClient, model_ids: dict[str, int], models: list[int]
 ) -> dict[int, Versions]:
     futures = (load_model_versions(client, model) for model in models)
     all_versions = await asyncio.gather(*futures, return_exceptions=True)
@@ -104,7 +108,7 @@ async def load_all_model_versions(
     if failed:
         raise RuntimeError(
             "Could not load dataset versions for the following models: "
-            + ", ".join(str(m) for m in failed)
+            + ", ".join(id_to_str(model_ids, m) for m in failed)
         )
 
     return dict(zip(models, all_versions))
@@ -176,20 +180,44 @@ def permute_parameter_grid(
         yield dict(zip(keys, v))
 
 
-async def load_all_data(client: CacheClient, config: Config, output_path: str) -> None:
-    all_versions = await load_all_model_versions(client, config["model"])
+async def load_all_data(
+    client: CacheClient, config: Config, metadata: Metadata, output_path: str
+) -> None:
+    all_versions = await load_all_model_versions(
+        client, metadata["model"], config["model"]
+    )
 
     data_futures = []
-    for params in permute_parameter_grid(config):
+    all_params = list(permute_parameter_grid(config))
+    for params in all_params:
         versions = all_versions[params["model"]]
         version = get_model_version(versions, params["measure"])
         data_futures.append(load_dataset(client, params, version))
 
-    all_data: list[pd.DataFrame] = await asyncio.gather(*data_futures)
-    print(f"Loaded {len(all_data)} data files (or tried to)")
+    print(f"{len(data_futures)} data files to download")
+    all_data = await asyncio.gather(*data_futures, return_exceptions=True)
+
+    failed: list[dict[str, str]] = []
+    for params, data in zip(all_params, all_data):
+        if isinstance(data, BaseException):
+            # Convert params from integer IDs to string representation
+            failed.append({k: id_to_str(metadata[k], v) for k, v in params.items()})
+    if failed:
+        print(
+            f"WARNING: Failed to download data for {len(failed)}/{len(all_data)} "
+            "parameter sets failed. The parameter sets were:"
+        )
+        for p in failed:
+            print(f" - {p!r}")
+
+    if len(failed) == len(all_data):
+        # Then there's no data to save
+        return
 
     # Merge DataFrames
-    df = pd.concat(all_data, ignore_index=True)
+    df = pd.concat(
+        (d for d in all_data if isinstance(d, pd.DataFrame)), ignore_index=True
+    )
 
     # Save combined dataset to file
     print(f"Saving data to {output_path}")
@@ -287,7 +315,7 @@ async def main() -> int:
 
         if args.config_path:
             config = load_config(args.config_path, metadata)
-            await load_all_data(client, config, args.output_path)
+            await load_all_data(client, config, metadata, args.output_path)
 
     return 0
 
