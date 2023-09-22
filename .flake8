@@ -2,7 +2,6 @@
 max-line-length = 88
 extend-ignore =
 	E203,
-	D1, 
 required-plugins =
 	flake8-docstring,
 docstring-convention = google

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""The entry point for EPI downloader."""
+"""EPI downloader is a tool for bulk downloading datasets from the IHME website.
+
+The EPI visualisation website from which the datasets are downloaded can be found here:
+        https://vizhub.healthdata.org/epi
+"""
 import argparse
 import asyncio
 import json
@@ -31,14 +35,31 @@ Config = dict[str, list[int]]
 
 
 class CacheClient:
+    """A wrapper around AsyncClient which caches downloaded data on disk."""
+
     def __init__(
         self, client: AsyncClient, cache_path: Path, ignore_cache: bool
     ) -> None:
+        """Create a new cache client.
+
+        Args:
+            client: HTTP client
+            cache_path: Where to save cached data
+            ignore_cache: If true, redownload data even if it is in the cache
+        """
         self._client = client
         self._cache_path = cache_path
         self._ignore_cache = ignore_cache
 
     async def get(self, url: str, file_name: str, *args: Any, **kwargs: Any) -> str:
+        """Load data from the specified URL.
+
+        Args:
+            url: The URL from which to download data
+            file_name: The unique name to use for the cached file
+            args: Arguments to pass to AsyncClient.get
+            kwargs: Keyword arguments to pass to AsyncClient.get
+        """
         file_path = self._cache_path / file_name
 
         # If the data has already been cached (and the user hasn't opted out of using
@@ -59,6 +80,7 @@ class CacheClient:
 
 
 async def load_model_versions(client: CacheClient, model: int) -> Versions:
+    """Load a list of possible data versions fo the given model."""
     # NB: I'm not sure what the step param means, but it seems to be empty for the
     # datasets I've been downloading -- AD
     params = {"model": model, "step": ""}
@@ -94,12 +116,20 @@ def get_model_version(versions: Versions, measure: int) -> int:
 
 
 def id_to_str(id_dict: dict[str, int], id: int) -> str:
+    """Convert an integer ID for a param to its string representation."""
     return next(k for k, v in id_dict.items() if v == id)
 
 
 async def load_all_model_versions(
     client: CacheClient, model_ids: dict[str, int], models: list[int]
 ) -> dict[int, Versions]:
+    """Load model versions for multiple models.
+
+    Args:
+        client: HTTP client
+        model_ids: The string representations for each model
+        models: Which models to get the dataset versions for
+    """
     futures = (load_model_versions(client, model) for model in models)
     all_versions = await asyncio.gather(*futures, return_exceptions=True)
 
@@ -115,6 +145,7 @@ async def load_all_model_versions(
 
 
 def load_config(config_path: str, metadata: Metadata) -> Config:
+    """Load the config file from disk."""
     with open(config_path) as file:
         config = json.load(file)
 
@@ -142,6 +173,13 @@ def load_config(config_path: str, metadata: Metadata) -> Config:
 async def load_dataset(
     client: CacheClient, params: dict[str, int], version: int
 ) -> pd.DataFrame:
+    """Load a dataset for the given parameter set.
+
+    Args:
+        client: HTTP client
+        params: Parameter set
+        version: Which dataset version (i.e. ID number) to download
+    """
     # Append version ID to params
     all_params: dict[str, Any] = params | {"version": version}
 
@@ -199,6 +237,7 @@ async def load_all_data(
     config: Config,
     model_versions: dict[int, Versions],
 ) -> list[pd.DataFrame]:
+    """Load datasets for all specified parameters."""
     data_futures = []
     all_params = list(permute_parameter_grid(config))
     for params in all_params:
@@ -227,6 +266,7 @@ async def load_all_data(
 
 
 def save_datasets(datasets: list[pd.DataFrame], output_path: str) -> None:
+    """Merge multiple datasets and save to a single output file."""
     # Merge DataFrames
     df = pd.concat(datasets, ignore_index=True)
 
@@ -236,6 +276,12 @@ def save_datasets(datasets: list[pd.DataFrame], output_path: str) -> None:
 
 
 def parse_metadata(metadata: dict[str, Any]) -> Metadata:
+    """Parse the raw metadata retrieved from the EPI website.
+
+    Returns:
+        A dict where the key is a string representation and the value is the
+        corresponding integer ID.
+    """
     out = {}
     for var in REQUIRED_VARS:
         out[var] = {
@@ -246,17 +292,24 @@ def parse_metadata(metadata: dict[str, Any]) -> Metadata:
 
 
 def write_json(file_name: str, data: Any) -> None:
+    """Save the specified data to disk in JSON format."""
     print(f"Saving {file_name}")
     with open(file_name, "w") as file:
         json.dump(data, file, indent=4)
 
 
 async def load_metadata(client: CacheClient) -> Metadata:
+    """Load the metadata from the EPI website.
+
+    This metadata contains the names of various parameter values (e.g. disease type, age
+    group) and corresponding ID numbers.
+    """
     text = await client.get("/api/metadata", "metadata.json")
     return parse_metadata(json.loads(text)["data"])
 
 
-def parse_args() -> argparse.Namespace:
+def parse_cli_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         prog=APP_NAME, description="A tool to download datasets from IHME"
     )
@@ -313,7 +366,8 @@ def parse_args() -> argparse.Namespace:
 
 
 async def main() -> int:
-    args = parse_args()
+    """Main entry point for the program."""
+    args = parse_cli_args()
 
     async with AsyncClient(base_url=EPI_BASE_URL) as http_client:
         cache_path = platformdirs.user_cache_path(APP_NAME, ensure_exists=True)
