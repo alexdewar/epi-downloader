@@ -181,22 +181,22 @@ def permute_parameter_grid(
 
 
 async def load_all_data(
-    client: CacheClient, config: Config, metadata: Metadata, output_path: str
-) -> None:
-    all_versions = await load_all_model_versions(
-        client, metadata["model"], config["model"]
-    )
-
+    client: CacheClient,
+    metadata: Metadata,
+    config: Config,
+    model_versions: dict[int, Versions],
+) -> list[pd.DataFrame]:
     data_futures = []
     all_params = list(permute_parameter_grid(config))
     for params in all_params:
-        versions = all_versions[params["model"]]
+        versions = model_versions[params["model"]]
         version = get_model_version(versions, params["measure"])
         data_futures.append(load_dataset(client, params, version))
 
     print(f"{len(data_futures)} data files to download")
     all_data = await asyncio.gather(*data_futures, return_exceptions=True)
 
+    # Print out a message indicating which param sets failed to download
     failed: list[dict[str, str]] = []
     for params, data in zip(all_params, all_data):
         if isinstance(data, BaseException):
@@ -210,14 +210,12 @@ async def load_all_data(
         for p in failed:
             print(f" - {p!r}")
 
-    if len(failed) == len(all_data):
-        # Then there's no data to save
-        return
+    return [d for d in all_data if isinstance(d, pd.DataFrame)]
 
+
+def save_datasets(datasets: list[pd.DataFrame], output_path: str) -> None:
     # Merge DataFrames
-    df = pd.concat(
-        (d for d in all_data if isinstance(d, pd.DataFrame)), ignore_index=True
-    )
+    df = pd.concat(datasets, ignore_index=True)
 
     # Save combined dataset to file
     print(f"Saving data to {output_path}")
@@ -315,7 +313,14 @@ async def main() -> int:
 
         if args.config_path:
             config = load_config(args.config_path, metadata)
-            await load_all_data(client, config, metadata, args.output_path)
+            model_versions = await load_all_model_versions(
+                client, metadata["model"], config["model"]
+            )
+
+            if datasets := await load_all_data(
+                client, metadata, config, model_versions
+            ):
+                save_datasets(datasets, args.output_path)
 
     return 0
 
