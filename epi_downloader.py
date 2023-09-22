@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """The entry point for EPI downloader."""
 import argparse
 import asyncio
