@@ -18,6 +18,9 @@ black = "^23.1.0"
 flake8 = "^6.0.0"
 flake8-docstrings = "^1.6.0"
 
+[tool.poetry.group.dev.dependencies]
+pyinstaller = "^5.13.2"
+
 [tool.mypy]
 warn_unreachable = true
 warn_unused_ignores = true
