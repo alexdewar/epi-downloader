@@ -97,7 +97,15 @@ async def load_all_model_versions(
     client: CacheClient, models: list[int]
 ) -> dict[int, Versions]:
     futures = (load_model_versions(client, model) for model in models)
-    all_versions: list[Versions] = await asyncio.gather(*futures)
+    all_versions = await asyncio.gather(*futures, return_exceptions=True)
+
+    # Check if versions could not be retrieved for any of the models
+    failed = [m for m, v in zip(models, all_versions) if isinstance(v, BaseException)]
+    if failed:
+        raise RuntimeError(
+            "Could not load dataset versions for the following models: "
+            + ", ".join(str(m) for m in failed)
+        )
 
     return dict(zip(models, all_versions))
 
