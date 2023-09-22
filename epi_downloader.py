@@ -119,9 +119,22 @@ def load_config(config_path: str, metadata: Metadata) -> Config:
         config = json.load(file)
 
     out: Config = {}
+    errors: dict[str, list[str]] = {}
     for key, values in config.items():
-        # Convert the names to corresponding integer IDs
-        out[key] = [metadata[key][str(value)] for value in values]
+        out[key] = []
+        for value in values:
+            try:
+                # Convert the names to corresponding integer IDs
+                out[key].append(metadata[key][str(value)])
+            except KeyError:
+                if key not in errors:
+                    errors[key] = []
+                errors[key].append(str(value))
+
+    if errors:
+        raise RuntimeError(
+            f"The following values in the config file are invalid: {errors!r}"
+        )
 
     return out
 
