@@ -1,45 +1,55 @@
-# Poetry Template
+# EPI downloader
 
-[![Test and build](https://github.com/ImperialCollegeLondon/poetry_template_2/actions/workflows/ci.yml/badge.svg)](https://github.com/ImperialCollegeLondon/poetry_template_2/actions/workflows/ci.yml)
+This is a tool for downloading data from IHME's [EPI visualisation website]. It is a
+Python script with dependencies managed by [Poetry].
 
-This is a minimal Python 3.11 application that uses [poetry](https://python-poetry.org) for packaging and dependency management. It also provides [pre-commit](https://pre-commit.com/) hooks (for [isort](https://pycqa.github.io/isort/), [Black](https://black.readthedocs.io/en/stable/), [Flake8](https://flake8.pycqa.org/en/latest/) and [mypy](https://mypy.readthedocs.io/en/stable/)) and automated tests using [pytest](https://pytest.org/) and [GitHub Actions](https://github.com/features/actions). Pre-commit hooks are automatically kept updated with a dedicated GitHub Action, this can be removed and replace with [pre-commit.ci](https://pre-commit.ci) if using an public repo. It was developed by the [Imperial College Research Computing Service](https://www.imperial.ac.uk/admin-services/ict/self-service/research-support/rcs/).
+While you can run the script directly, provided you have installed the dependencies with
+Poetry, there are bundled executables provided on the [releases page] of this repo.
 
-To use this repository as a template for your own application:
+Once you have downloaded the application for your OS, you can run it directly from the
+console.
 
-1. [Download and install Poetry](https://python-poetry.org/docs/#installation) following the instructions for your OS.
-2. Click the green "Use this template" button above
-3. Name and create your repository
-4. Clone your new repository and make it your working directory
-5. Replace instances of `myproject` with your own application name. Edit:
-   - `pyproject.toml`
-   - `tests/test_myproject.py`
-   - Rename `myproject` directory
-6. Set up the virtual environment:
+First you will want to download metadata and generate an example config file, which you
+can then modify to select the parameters you want to download data for. To do this, run,
+e.g. on Windows:
 
-   ```bash
-   poetry install
-   ```
+```shell
+.\epi_downloader_windows.exe --dump-config
+```
 
-7. Activate the virtual environment (alternatively, ensure any python-related command is preceded by `poetry run`):
+This will create two files: `metadata.json` and `example_config.json`. The
+`metadata.json` file contains a list of the valid options for each of the parameters.
+Choose the ones you want and edit the config file accordingly. Here is an example:
 
-   ```bash
-   poetry shell
-   ```
+```json
+{
+  "model": ["Diabetes mellitus"],
+  "measure": ["Prevalence"],
+  "year": ["2015", "2019"],
+  "age": ["20-24 years"],
+  "sex": ["Male", "Female"]
+}
+```
 
-8. Install the git hooks:
+Once you have finished, you can download all the datasets for these parameters and
+combine them into a single CSV file. To do this, run, e.g.:
 
-   ```bash
-   pre-commit install
-   ```
+```shell
+.\epi_downloader_windows.exe -c my_config_file.json -o data.csv
+```
 
-9. Run the main app:
+This will create a new file `data.csv` which contains the combined datasets.
 
-   ```bash
-   python -m myproject
-   ```
+[EPI visualisation website]: https://vizhub.healthdata.org/epi
+[Poetry]: https://python-poetry.org/
+[releases page]: ../../releases
 
-10. Run the tests:
+## Caching
 
-   ```bash
-   pytest
-   ```
+Downloaded datasets are cached on disk to speed up future searches. If for some reason
+you want to ensure the server is being queried directly (e.g. to check for new
+datasets), pass the `--no-cache` flag, e.g.:
+
+```shell
+.\epi_downloader_windows.exe -c my_config_file.json -o data.csv --no-cache
+```
