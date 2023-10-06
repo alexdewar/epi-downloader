@@ -65,7 +65,7 @@ class CacheClient:
         # If the data has already been cached (and the user hasn't opted out of using
         # the cache) then load it from disk
         if not self._ignore_cache and file_path.exists():
-            with file_path.open() as file:
+            with file_path.open(encoding="utf-8") as file:
                 return file.read()
 
         # Make HTTP request
@@ -73,7 +73,7 @@ class CacheClient:
         response.raise_for_status()
 
         # Cache data on disk
-        with file_path.open("w") as file:
+        with file_path.open("w", encoding="utf-8") as file:
             file.write(response.text)
 
         return response.text
@@ -146,7 +146,7 @@ async def load_all_model_versions(
 
 def load_config(config_path: str, metadata: Metadata) -> Config:
     """Load the config file from disk."""
-    with open(config_path) as file:
+    with open(config_path, encoding="utf-8") as file:
         config = json.load(file)
 
     out: Config = {}
@@ -294,7 +294,7 @@ def parse_metadata(metadata: dict[str, Any]) -> Metadata:
 def write_json(file_name: str, data: Any) -> None:
     """Save the specified data to disk in JSON format."""
     print(f"Saving {file_name}")
-    with open(file_name, "w") as file:
+    with open(file_name, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4)
 
 
