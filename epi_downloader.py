@@ -22,7 +22,7 @@ APP_NAME = "epi_downloader"
 EPI_BASE_URL = "https://vizhub.healthdata.org/epi"
 REQUIRED_VARS = ("model", "measure", "year", "age", "sex")
 EXAMPLE_CONFIG = {
-    "model": ["Diabetes mellitus"],
+    "model": ["Diabetes Mellitus - Total"],
     "measure": ["Prevalence"],
     "year": ["2015"],
     "age": ["20-24 years"],
