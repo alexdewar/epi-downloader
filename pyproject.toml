@@ -3,6 +3,7 @@ name = "EPI downloader"
 version = "0.2.0"
 description = "A tool for downloading data from the Epi Visualisation website."
 authors = ["Alex Dewar <a.dewar@imperial.ac.uk>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10, <3.12"
